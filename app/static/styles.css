@@ -1,0 +1,65 @@
+:root {
+  --bg: #f6f4ef;
+  --ink: #1c1a16;
+  --muted: #5c574e;
+  --accent: #0f5c4c;
+  --danger: #8b2e1f;
+  --card: #fffdf8;
+  --line: #d9d2c4;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: "Source Serif 4", "Iowan Old Style", Georgia, serif;
+  background: radial-gradient(circle at top left, #efe8d8, var(--bg) 45%);
+  color: var(--ink);
+  min-height: 100vh;
+}
+.site-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--line);
+}
+.brand { font-weight: 700; font-size: 1.25rem; color: var(--ink); text-decoration: none; }
+nav { display: flex; gap: 1rem; align-items: center; }
+nav a { color: var(--accent); text-decoration: none; }
+main { max-width: 960px; margin: 0 auto; padding: 1.5rem; }
+label { display: block; margin-bottom: 0.75rem; }
+input, textarea, select, button {
+  font: inherit;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--card);
+}
+button {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+  cursor: pointer;
+}
+.error { color: var(--danger); }
+.inline { display: inline; }
+.inline button { background: transparent; color: var(--accent); border: none; }
+.auth { max-width: 360px; margin: 3rem auto; }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 0.5rem; border-bottom: 1px solid var(--line); }
+.tg-preview {
+  background: #0e1621;
+  color: #e4ecf2;
+  border-radius: 12px;
+  padding: 1rem;
+  max-width: 360px;
+  font-family: system-ui, sans-serif;
+}
+.tg-preview .bubble {
+  background: #182533;
+  border-radius: 10px;
+  padding: 0.75rem;
+}
+.tg-preview .thumbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 0.35rem; margin-top: 0.5rem; }
+.tg-preview img, .tg-preview video { width: 100%; border-radius: 6px; }
+.layout-split { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+@media (max-width: 800px) { .layout-split { grid-template-columns: 1fr; } }
