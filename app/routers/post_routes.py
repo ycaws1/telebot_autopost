@@ -102,6 +102,37 @@ async def create_post_route(
     return RedirectResponse(f"/posts/{post.id}", status_code=303)
 
 
+@router.post("/posts/preview")
+async def preview_post(
+    request: Request,
+    caption: str = Form(""),
+    media: list[UploadFile] | None = File(None),
+    db: Session = Depends(get_db),
+):
+    user = _user_or_login(request, db)
+    if user is None:
+        return RedirectResponse("/login", status_code=303)
+    settings = get_settings()
+    if not settings.preview_chat_id:
+        return RedirectResponse("/posts/new?error=Set+PREVIEW_CHAT_ID", status_code=303)
+    files = await _read_uploads(media or [])
+    tmp_dir = settings.media_dir / "_preview"
+    tmp_dir.mkdir(parents=True, exist_ok=True)
+    items: list[MediaItem] = []
+    paths = []
+    try:
+        for idx, (filename, content, media_type) in enumerate(files):
+            path = tmp_dir / f"{idx}_{Path(filename).name}"
+            path.write_bytes(content)
+            paths.append(path)
+            items.append(MediaItem(media_type, path))  # type: ignore[arg-type]
+        await send_post(settings.preview_chat_id, caption, items)
+    finally:
+        for path in paths:
+            path.unlink(missing_ok=True)
+    return RedirectResponse("/posts/new?preview=1", status_code=303)
+
+
 @router.get("/posts/{post_id}", response_class=HTMLResponse)
 def post_detail(post_id: int, request: Request, db: Session = Depends(get_db)):
     user = _user_or_login(request, db)
@@ -190,38 +221,3 @@ def retry_post_route(post_id: int, request: Request, db: Session = Depends(get_d
         return RedirectResponse("/login", status_code=303)
     posts_svc.retry_post(db, post_id)
     return RedirectResponse(f"/posts/{post_id}", status_code=303)
-
-
-@router.post("/posts/preview")
-async def preview_post(
-    request: Request,
-    caption: str = Form(""),
-    media: list[UploadFile] = File(default=[]),
-    db: Session = Depends(get_db),
-):
-    user = _user_or_login(request, db)
-    if user is None:
-        return RedirectResponse("/login", status_code=303)
-    settings = get_settings()
-    if not settings.preview_chat_id:
-        return RedirectResponse("/posts/new?error=Set+PREVIEW_CHAT_ID", status_code=303)
-    files = await _read_uploads(media)
-    # Write temp files for send
-    tmp_dir = settings.media_dir / "_preview"
-    tmp_dir.mkdir(parents=True, exist_ok=True)
-    items: list[MediaItem] = []
-    paths = []
-    try:
-        for idx, (filename, content, media_type) in enumerate(files):
-            path = tmp_dir / f"{idx}_{Path(filename).name}"
-            path.write_bytes(content)
-            paths.append(path)
-            items.append(MediaItem(media_type, path))  # type: ignore[arg-type]
-        await send_post(settings.preview_chat_id, caption, items)
-    except Exception:
-        # swallow into redirect; UI shows flash later
-        pass
-    finally:
-        for path in paths:
-            path.unlink(missing_ok=True)
-    return RedirectResponse("/posts/new?preview=1", status_code=303)
