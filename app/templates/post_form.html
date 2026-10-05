@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}{% if post %}Edit{% else %}New{% endif %} post — Telebot{% endblock %}
+{% block content %}
+<h1>{% if post %}Edit post{% else %}New post{% endif %}</h1>
+{% if error %}<p class="error">{{ error }}</p>{% endif %}
+<div class="layout-split">
+  <form method="post" enctype="multipart/form-data" action="{% if post %}/posts/{{ post.id }}{% else %}/posts{% endif %}" id="post-form">
+    <label>Channel
+      <select name="channel_id" required>
+        {% for c in channels %}
+        <option value="{{ c.id }}" {% if post and post.channel_id == c.id %}selected{% endif %}>{{ c.name }} ({{ c.chat_id }})</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Schedule
+      <input type="datetime-local" name="scheduled_at" required
+        value="{% if post %}{{ post.scheduled_at.strftime('%Y-%m-%dT%H:%M') }}{% endif %}">
+    </label>
+    <label>Caption
+      <textarea name="caption" id="caption" rows="5">{{ post.caption if post and post.caption else '' }}</textarea>
+    </label>
+    {% if post and post.media %}
+    <fieldset>
+      <legend>Existing media (uncheck to remove)</legend>
+      {% for m in post.media %}
+      <label><input type="checkbox" name="keep_media" value="{{ m.id }}" checked> {{ m.media_type }} — {{ m.media_path }}</label>
+      {% endfor %}
+    </fieldset>
+    {% endif %}
+    <label>Add media (photo/video, max 10)
+      <input type="file" name="media" id="media" accept="image/*,video/*" multiple>
+    </label>
+    <button type="submit">Save</button>
+    <button type="submit" formaction="/posts/preview" formmethod="post">Send preview to me</button>
+  </form>
+  <aside>
+    <h2>Preview</h2>
+    <div class="tg-preview" id="tg-preview">
+      <div class="bubble">
+        <div class="caption" id="preview-caption"></div>
+        <div class="thumbs" id="preview-thumbs"></div>
+      </div>
+    </div>
+  </aside>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="/static/preview.js"></script>
+{% endblock %}

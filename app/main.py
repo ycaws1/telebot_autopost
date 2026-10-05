@@ -12,7 +12,7 @@ from app.auth import bootstrap_admin, get_current_user
 from app.config import get_settings
 from app import db as dbmod
 from app.db import get_db, init_db
-from app.routers import auth_routes, channel_routes
+from app.routers import auth_routes, channel_routes, post_routes
 
 
 @asynccontextmanager
@@ -33,6 +33,7 @@ app.add_middleware(SessionMiddleware, secret_key=get_settings().secret_key)
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 app.include_router(auth_routes.router)
 app.include_router(channel_routes.router)
+app.include_router(post_routes.router)
 
 templates = Jinja2Templates(directory="app/templates")
 

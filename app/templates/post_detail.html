@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Post {{ post.id }} — Telebot{% endblock %}
+{% block content %}
+<h1>Post #{{ post.id }}</h1>
+<p>Status: <strong>{{ post.status }}</strong></p>
+<p>Channel: {{ post.channel.name }} ({{ post.channel.chat_id }})</p>
+<p>Scheduled: {{ post.scheduled_at }}</p>
+{% if post.posted_at %}<p>Posted at: {{ post.posted_at }}</p>{% endif %}
+{% if post.error %}<p class="error">{{ post.error }}</p>{% endif %}
+<pre>{{ post.caption or '' }}</pre>
+<ul>
+{% for m in post.media %}
+  <li>{{ m.media_type }} — {{ m.media_path }}</li>
+{% endfor %}
+</ul>
+<p>
+  {% if post.status in ['pending', 'failed'] %}
+  <a href="/posts/{{ post.id }}/edit">Edit</a>
+  {% endif %}
+  {% if post.status == 'pending' %}
+  <form class="inline" method="post" action="/posts/{{ post.id }}/cancel"><button type="submit">Cancel</button></form>
+  {% endif %}
+  {% if post.status == 'failed' %}
+  <form class="inline" method="post" action="/posts/{{ post.id }}/retry"><button type="submit">Retry</button></form>
+  {% endif %}
+</p>
+{% endblock %}
