@@ -3,4 +3,38 @@
 {% block content %}
 <h1>Dashboard</h1>
 <p>Signed in as {{ user.username }}</p>
+
+<h2>Upcoming</h2>
+<table>
+  <thead><tr><th>When</th><th>Channel</th><th>Caption</th><th></th></tr></thead>
+  <tbody>
+  {% for p in pending %}
+    <tr>
+      <td>{{ p.scheduled_at }}</td>
+      <td>{{ p.channel.name }}</td>
+      <td>{{ (p.caption or '')[:80] }}</td>
+      <td><a href="/posts/{{ p.id }}">View</a></td>
+    </tr>
+  {% else %}
+    <tr><td colspan="4">No pending posts.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+<h2>Recent</h2>
+<table>
+  <thead><tr><th>Status</th><th>Channel</th><th>Caption</th><th></th></tr></thead>
+  <tbody>
+  {% for p in recent %}
+    <tr>
+      <td>{{ p.status }}</td>
+      <td>{{ p.channel.name }}</td>
+      <td>{{ (p.caption or '')[:80] }}</td>
+      <td><a href="/posts/{{ p.id }}">View</a></td>
+    </tr>
+  {% else %}
+    <tr><td colspan="4">Nothing yet.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
 {% endblock %}
