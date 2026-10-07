@@ -11,33 +11,81 @@
   </div>
 </div>
 
-<section class="panel">
-  <div class="panel-body">
-    {% if post.attempt_count %}<p class="page-meta">Failed tries: {{ post.attempt_count }}</p>{% endif %}
-    <p>Channel: <strong>{{ post.channel.name }}</strong> <span class="mono">({{ post.channel.chat_id }})</span></p>
-    <p>Scheduled: {{ format_local_display(post.scheduled_at) }}</p>
-    {% if post.posted_at %}<p>Posted at: {{ format_local_display(post.posted_at) }}</p>{% endif %}
-    {% if post.error %}<p class="error">Error: {{ post.error }}</p>{% endif %}
-    <pre>{{ post.caption or '' }}</pre>
-    <ul>
-    {% for m in post.media %}
-      <li class="mono">{{ m.media_type }} — {{ m.media_path }}</li>
-    {% endfor %}
-    </ul>
-    <p class="actions-cell">
-      {% if post.status in ['pending', 'failed'] %}
-      <a href="/posts/{{ post.id }}/edit">Edit</a>
-      {% endif %}
-      {% if post.status == 'pending' %}
-      <form class="inline" method="post" action="/posts/{{ post.id }}/cancel"><button type="submit">Cancel</button></form>
-      {% endif %}
-      {% if post.status == 'failed' %}
-      <form class="inline" method="post" action="/posts/{{ post.id }}/retry"><button type="submit">Retry</button></form>
-      {% endif %}
-      {% if post.status in ['posted', 'cancelled'] %}
-      <form class="inline" method="post" action="/posts/{{ post.id }}/requeue"><button type="submit">Requeue to resend</button></form>
-      {% endif %}
-    </p>
-  </div>
-</section>
+{% set media_items = post.media|sort(attribute='sort_order') %}
+{% set media_count = media_items|length %}
+{% if media_count <= 1 %}{% set album_class = 'album-1' %}
+{% elif media_count == 2 %}{% set album_class = 'album-2' %}
+{% elif media_count == 3 %}{% set album_class = 'album-3' %}
+{% elif media_count == 4 %}{% set album_class = 'album-4' %}
+{% elif media_count <= 6 %}{% set album_class = 'album-6' %}
+{% elif media_count <= 9 %}{% set album_class = 'album-9' %}
+{% else %}{% set album_class = 'album-10' %}{% endif %}
+{% set has_content = ((post.caption or '')|trim|length > 0) or media_count > 0 %}
+
+<div class="layout-split">
+  <section class="panel">
+    <div class="panel-head"><h2>Details</h2></div>
+    <div class="panel-body">
+      {% if post.attempt_count %}<p class="page-meta">Failed tries: {{ post.attempt_count }}</p>{% endif %}
+      <p>Channel: <strong>{{ post.channel.name }}</strong> <span class="mono">({{ post.channel.chat_id }})</span></p>
+      <p>Scheduled: {{ format_local_display(post.scheduled_at) }}</p>
+      {% if post.posted_at %}<p>Posted at: {{ format_local_display(post.posted_at) }}</p>{% endif %}
+      {% if post.error %}<p class="error">Error: {{ post.error }}</p>{% endif %}
+      <p class="actions-cell">
+        {% if post.status in ['pending', 'failed'] %}
+        <a href="/posts/{{ post.id }}/edit">Edit</a>
+        {% endif %}
+        {% if post.status == 'pending' %}
+        <form class="inline" method="post" action="/posts/{{ post.id }}/cancel"><button type="submit">Cancel</button></form>
+        {% endif %}
+        {% if post.status == 'failed' %}
+        <form class="inline" method="post" action="/posts/{{ post.id }}/retry"><button type="submit">Retry</button></form>
+        {% endif %}
+        {% if post.status in ['posted', 'cancelled'] %}
+        <form class="inline" method="post" action="/posts/{{ post.id }}/requeue"><button type="submit">Requeue to resend</button></form>
+        {% endif %}
+      </p>
+    </div>
+  </section>
+
+  <aside>
+    <section class="panel">
+      <div class="panel-head"><h2>Telegram preview</h2></div>
+      <div class="panel-body">
+        <div class="tg-phone">
+          <div class="tg-chat">
+            {% if has_content %}
+            <div class="tg-msg {% if media_count %}media-post{% else %}text-only{% endif %}">
+              <div class="tg-author">{{ post.channel.name }}</div>
+              {% if media_count %}
+              <div class="tg-media {{ album_class }}">
+                {% for m in media_items %}
+                <div class="tg-cell">
+                  {% if m.media_type == 'video' %}
+                  <video src="/media/{{ m.id }}" muted playsinline preload="metadata"></video>
+                  <span class="tg-video-badge">▶</span>
+                  {% else %}
+                  <img src="/media/{{ m.id }}" alt="media {{ loop.index }}">
+                  {% endif %}
+                </div>
+                {% endfor %}
+              </div>
+              {% endif %}
+              {% if post.caption %}
+              <div class="tg-caption">{{ post.caption }}</div>
+              {% endif %}
+              <div class="tg-meta">
+                <span>{{ format_local_display(post.posted_at or post.scheduled_at) }}</span>
+                <span class="tg-views">👁 {% if post.status == 'posted' %}posted{% else %}preview{% endif %}</span>
+              </div>
+            </div>
+            {% else %}
+            <p class="tg-empty">No caption or media</p>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </section>
+  </aside>
+</div>
 {% endblock %}

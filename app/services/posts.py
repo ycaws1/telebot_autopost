@@ -25,6 +25,25 @@ def detect_media_type(filename: str, hinted: str | None = None) -> str:
     raise ValueError(f"Unsupported media type for {filename}")
 
 
+def parse_media_order(tokens: list[str] | None) -> list[tuple[str, int]]:
+    """Parse media_order tokens like e:12 / n:0 into (kind, value) pairs."""
+    if not tokens:
+        return []
+    parsed: list[tuple[str, int]] = []
+    for raw in tokens:
+        value = (raw or "").strip()
+        if not value or ":" not in value:
+            raise ValueError(f"Invalid media_order token: {raw!r}")
+        kind, rest = value.split(":", 1)
+        if kind not in ("e", "n"):
+            raise ValueError(f"Invalid media_order kind: {kind!r}")
+        try:
+            parsed.append((kind, int(rest)))
+        except ValueError as exc:
+            raise ValueError(f"Invalid media_order index: {raw!r}") from exc
+    return parsed
+
+
 def get_post(db: Session, post_id: int) -> Post:
     post = db.get(Post, post_id)
     if post is None:
@@ -85,6 +104,7 @@ def update_post(
     scheduled_at: datetime | None = None,
     keep_media_ids: list[int] | None = None,
     new_files: list[tuple[str, bytes, str]] | None = None,
+    media_order: list[str] | None = None,
 ) -> Post:
     post = get_post(db, post_id)
     if post.status not in (PostStatus.PENDING, PostStatus.FAILED):
@@ -99,42 +119,89 @@ def update_post(
     if scheduled_at is not None:
         post.scheduled_at = to_utc(scheduled_at)
 
-    existing = list(post.media)
-    if keep_media_ids is not None:
-        keep = set(keep_media_ids)
-        for m in existing:
-            if m.id not in keep:
+    new_files = new_files or []
+    order = parse_media_order(media_order)
+    media_root = get_settings().media_dir / str(post.id)
+    media_root.mkdir(parents=True, exist_ok=True)
+
+    if order:
+        keep_ids = {val for kind, val in order if kind == "e"}
+        for m in list(post.media):
+            if m.id not in keep_ids:
                 path = Path(m.media_path)
                 if path.is_file():
                     path.unlink(missing_ok=True)
                 db.delete(m)
         db.flush()
-        existing = [m for m in post.media if m.id in keep]
+        by_id = {m.id: m for m in post.media if m.id in keep_ids}
+        if len(order) > 10:
+            raise ValueError("Maximum 10 media files per post")
+        used_new: set[int] = set()
+        for idx, (kind, val) in enumerate(order):
+            if kind == "e":
+                row = by_id.get(val)
+                if row is None:
+                    raise ValueError(f"Unknown media id in order: {val}")
+                row.sort_order = idx
+                continue
+            if val < 0 or val >= len(new_files):
+                raise ValueError(f"media_order new index out of range: {val}")
+            if val in used_new:
+                raise ValueError(f"Duplicate new media index in order: {val}")
+            used_new.add(val)
+            filename, content, hinted = new_files[val]
+            media_type = detect_media_type(filename, hinted)
+            dest = media_root / f"{idx:02d}_{Path(filename).name}"
+            dest.write_bytes(content)
+            db.add(
+                PostMedia(
+                    post_id=post.id,
+                    media_type=media_type,
+                    media_path=str(dest),
+                    sort_order=idx,
+                )
+            )
+        if used_new != set(range(len(new_files))):
+            raise ValueError("media_order must include every uploaded file once")
+        total = len(order)
+    else:
+        existing = list(post.media)
+        if keep_media_ids is not None:
+            keep = set(keep_media_ids)
+            for m in existing:
+                if m.id not in keep:
+                    path = Path(m.media_path)
+                    if path.is_file():
+                        path.unlink(missing_ok=True)
+                    db.delete(m)
+            db.flush()
+            existing = [m for m in post.media if m.id in keep]
+            for idx, m in enumerate(
+                sorted(existing, key=lambda row: row.sort_order)
+            ):
+                m.sort_order = idx
 
-    new_files = new_files or []
-    total = len(existing) + len(new_files)
-    if total > 10:
-        raise ValueError("Maximum 10 media files per post")
+        total = len(existing) + len(new_files)
+        if total > 10:
+            raise ValueError("Maximum 10 media files per post")
+
+        start = max((m.sort_order for m in existing), default=-1) + 1
+        for offset, (filename, content, hinted) in enumerate(new_files):
+            media_type = detect_media_type(filename, hinted)
+            dest = media_root / f"{start + offset:02d}_{Path(filename).name}"
+            dest.write_bytes(content)
+            db.add(
+                PostMedia(
+                    post_id=post.id,
+                    media_type=media_type,
+                    media_path=str(dest),
+                    sort_order=start + offset,
+                )
+            )
 
     caption_val = post.caption or ""
     if total == 0 and not caption_val.strip():
         raise ValueError("caption is required for text-only posts")
-
-    media_root = get_settings().media_dir / str(post.id)
-    media_root.mkdir(parents=True, exist_ok=True)
-    start = max((m.sort_order for m in existing), default=-1) + 1
-    for offset, (filename, content, hinted) in enumerate(new_files):
-        media_type = detect_media_type(filename, hinted)
-        dest = media_root / f"{start + offset:02d}_{Path(filename).name}"
-        dest.write_bytes(content)
-        db.add(
-            PostMedia(
-                post_id=post.id,
-                media_type=media_type,
-                media_path=str(dest),
-                sort_order=start + offset,
-            )
-        )
 
     if post.status == PostStatus.FAILED:
         post.error = None

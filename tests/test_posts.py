@@ -60,6 +60,34 @@ def test_cannot_edit_posted(db):
         posts_svc.update_post(db, p.id, caption="nope")
 
 
+def test_update_media_order_interleaves_existing_and_new(db):
+    ch = create_channel(db, "C", "@c")
+    p = posts_svc.create_post(
+        db,
+        channel_id=ch.id,
+        caption="album",
+        scheduled_at=datetime.now(timezone.utc) + timedelta(hours=1),
+        files=[
+            ("a.jpg", b"a", "photo"),
+            ("b.jpg", b"b", "photo"),
+        ],
+    )
+    m0, m1 = sorted(p.media, key=lambda m: m.sort_order)
+    posts_svc.update_post(
+        db,
+        p.id,
+        keep_media_ids=[m0.id, m1.id],
+        new_files=[("clip.mp4", b"vid", "video")],
+        media_order=[f"e:{m1.id}", "n:0", f"e:{m0.id}"],
+    )
+    db.refresh(p)
+    ordered = sorted(p.media, key=lambda m: m.sort_order)
+    assert [m.media_type for m in ordered] == ["photo", "video", "photo"]
+    assert ordered[0].id == m1.id
+    assert ordered[2].id == m0.id
+    assert ordered[1].media_path.endswith("clip.mp4")
+
+
 def test_cancel_and_retry(db):
     ch = create_channel(db, "C", "@c")
     p = posts_svc.create_post(

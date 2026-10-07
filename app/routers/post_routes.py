@@ -125,6 +125,7 @@ async def preview_post(
     caption: str = Form(""),
     media: list[UploadFile] | None = File(None),
     keep_media: list[int] = Form(default=[]),
+    media_order: list[str] = Form(default=[]),
     db: Session = Depends(get_db),
 ):
     wants_json = "application/json" in (request.headers.get("accept") or "")
@@ -147,18 +148,36 @@ async def preview_post(
     items: list[MediaItem] = []
     paths: list[Path] = []
     try:
-        # Existing kept media first (same order as edit form)
-        for media_id in keep_media or []:
-            row = db.get(PostMedia, media_id)
-            if row is None or not Path(row.media_path).is_file():
-                continue
-            items.append(MediaItem(row.media_type, Path(row.media_path)))  # type: ignore[arg-type]
-
+        order = posts_svc.parse_media_order(media_order)
+        new_paths: list[Path] = []
         for idx, (filename, content, media_type) in enumerate(files):
             path = tmp_dir / f"{idx}_{Path(filename).name}"
             path.write_bytes(content)
             paths.append(path)
-            items.append(MediaItem(media_type, path))  # type: ignore[arg-type]
+            new_paths.append(path)
+
+        if order:
+            for kind, val in order:
+                if kind == "e":
+                    row = db.get(PostMedia, val)
+                    if row is None or not Path(row.media_path).is_file():
+                        continue
+                    items.append(MediaItem(row.media_type, Path(row.media_path)))  # type: ignore[arg-type]
+                elif 0 <= val < len(new_paths):
+                    items.append(
+                        MediaItem(
+                            files[val][2],  # type: ignore[arg-type]
+                            new_paths[val],
+                        )
+                    )
+        else:
+            for media_id in keep_media or []:
+                row = db.get(PostMedia, media_id)
+                if row is None or not Path(row.media_path).is_file():
+                    continue
+                items.append(MediaItem(row.media_type, Path(row.media_path)))  # type: ignore[arg-type]
+            for path, (_filename, _content, media_type) in zip(new_paths, files):
+                items.append(MediaItem(media_type, path))  # type: ignore[arg-type]
 
         if len(items) > 10:
             raise TelegramError("Maximum 10 media files per post")
@@ -167,7 +186,7 @@ async def preview_post(
 
         preview_caption = _preview_caption(caption)
         await send_post(preview_chat_id, preview_caption, items)
-    except TelegramError as exc:
+    except (TelegramError, ValueError) as exc:
         if wants_json:
             return JSONResponse({"ok": False, "error": str(exc)}, status_code=400)
         return RedirectResponse(
@@ -223,6 +242,7 @@ async def update_post_route(
     scheduled_at: str = Form(...),
     keep_media: list[int] = Form(default=[]),
     media: list[UploadFile] = File(default=[]),
+    media_order: list[str] = Form(default=[]),
     db: Session = Depends(get_db),
 ):
     user = _user_or_login(request, db)
@@ -238,6 +258,7 @@ async def update_post_route(
             scheduled_at=_parse_scheduled_at(scheduled_at),
             keep_media_ids=keep_media,
             new_files=files,
+            media_order=media_order,
         )
     except ValueError as exc:
         post = posts_svc.get_post(db, post_id)

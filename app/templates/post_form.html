@@ -38,23 +38,24 @@
         <label>Caption
           <textarea name="caption" id="caption" rows="5">{{ post.caption if post and post.caption else '' }}</textarea>
         </label>
-        {% if post and post.media %}
-        <fieldset id="existing-media">
-          <legend>Existing media (uncheck to remove)</legend>
-          {% for m in post.media %}
-          <label class="existing-media-item">
-            <input type="checkbox" name="keep_media" value="{{ m.id }}" checked
-              data-media-id="{{ m.id }}"
-              data-media-type="{{ m.media_type }}"
-              data-media-url="/media/{{ m.id }}">
-            {{ m.media_type }} — {{ m.media_path.split('/')[-1] }}
+        <fieldset class="media-queue-box">
+          <legend>Media order (max 10)</legend>
+          <p class="hint">Use ↑ ↓ to set album order. Add files in any order, then rearrange.</p>
+          <ul id="media-queue" class="media-queue"></ul>
+          <label class="media-add-label">Add photos or videos
+            <input type="file" name="media" id="media" accept="image/*,video/*" multiple>
           </label>
-          {% endfor %}
         </fieldset>
+        {% if post and post.media %}
+        <ul id="media-queue-seed" hidden>
+          {% for m in post.media %}
+          <li data-id="{{ m.id }}"
+              data-type="{{ m.media_type }}"
+              data-name="{{ m.media_path.split('/')[-1] }}"
+              data-url="/media/{{ m.id }}"></li>
+          {% endfor %}
+        </ul>
         {% endif %}
-        <label>Add media (photo/video, max 10)
-          <input type="file" name="media" id="media" accept="image/*,video/*" multiple>
-        </label>
         <button type="submit">Save</button>
         <button type="button" id="send-preview" class="secondary">Send preview to me</button>
       </form>

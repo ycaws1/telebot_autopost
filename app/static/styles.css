@@ -508,7 +508,18 @@ tbody tr:hover td { background: rgba(24, 37, 51, 0.55); }
   .layout-split { grid-template-columns: 1fr; }
 }
 
-.existing-media-item { font-size: 0.9rem; }
+.media-queue-box { margin: 0.75rem 0 1rem; padding: 0.75rem; border: 1px solid var(--line); border-radius: 8px; }
+.media-queue-box legend { padding: 0 0.35rem; color: var(--ink-soft); font-size: 0.9rem; }
+.media-queue { list-style: none; margin: 0.5rem 0 0.75rem; padding: 0; display: flex; flex-direction: column; gap: 0.4rem; }
+.media-queue-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
+  padding: 0.45rem 0.55rem; background: var(--panel-2, rgba(255,255,255,0.03));
+  border: 1px solid var(--line); border-radius: 6px; font-size: 0.9rem;
+}
+.media-queue-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.media-queue-actions { display: flex; gap: 0.35rem; flex-shrink: 0; }
+.media-queue-actions button { padding: 0.25rem 0.5rem; font-size: 0.8rem; }
+.media-add-label { margin-bottom: 0; }
 
 .tg-phone {
   background: #0e1621;
