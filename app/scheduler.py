@@ -8,7 +8,8 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from sqlalchemy.orm import Session, joinedload
 
 from app.models import Post, PostStatus
-from app.telegram_client import MediaItem, send_post as default_send
+from app.telegram_client import MediaItem
+from app.telegram_user import publish_post_as_user as default_publish
 from app.timeutil import assume_utc
 
 _scheduler: AsyncIOScheduler | None = None
@@ -28,12 +29,12 @@ def _is_due(post: Post, now: datetime) -> bool:
 
 async def process_due_posts(
     db_factory: Callable[[], Session],
-    send=default_send,
+    publish=default_publish,
 ) -> int:
-    """Claim and send all due pending posts. Uses the session from db_factory.
+    """Claim and publish all due pending posts. Uses the session from db_factory.
 
-    For tests, pass `lambda: db` with a shared session.
-    For production tick, pass a factory that opens a new session each call.
+    Default publish path: bot sends to preview DM (no [Preview] prefix), then
+    the user account forwards into the channel. For tests, pass a fake `publish`.
     """
     processed = 0
     db = db_factory()
@@ -64,7 +65,7 @@ async def process_due_posts(
             for item in items:
                 if not item.path.is_file():
                     raise FileNotFoundError(f"Missing media file: {item.path}")
-            await send(post.channel.chat_id, post.caption, items)
+            await publish(post.channel.chat_id, post.caption, items, db=db)
             post.status = PostStatus.POSTED
             post.posted_at = datetime.now(timezone.utc)
             post.error = None

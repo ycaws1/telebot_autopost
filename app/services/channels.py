@@ -17,6 +17,25 @@ def normalize_chat_id(chat_id: str) -> str:
     return f"@{value}"
 
 
+def chat_id_match_key(chat_id: str) -> str:
+    """Normalized key for duplicate checks (@username compared case-insensitively)."""
+    value = normalize_chat_id(chat_id)
+    if value.startswith("@"):
+        return value.lower()
+    return value
+
+
+def find_channel_by_chat_id(db: Session, *chat_ids: str) -> Channel | None:
+    """Return an existing channel matching any of the given ids/usernames."""
+    keys = {chat_id_match_key(c) for c in chat_ids if (c or "").strip()}
+    if not keys:
+        return None
+    for channel in db.query(Channel).all():
+        if chat_id_match_key(channel.chat_id) in keys:
+            return channel
+    return None
+
+
 async def verify_chat_id(chat_id: str, bot_token: str) -> tuple[bool, str]:
     """Return (ok, message). Uses Telegram getChat."""
     ok, message, _ = await lookup_chat(chat_id, bot_token)
@@ -62,7 +81,13 @@ async def lookup_chat(
 
 
 def create_channel(db: Session, name: str, chat_id: str) -> Channel:
-    channel = Channel(name=name.strip(), chat_id=normalize_chat_id(chat_id))
+    normalized = normalize_chat_id(chat_id)
+    existing = find_channel_by_chat_id(db, normalized)
+    if existing is not None:
+        raise ValueError(
+            f"Channel already added: {existing.name} ({existing.chat_id})"
+        )
+    channel = Channel(name=name.strip(), chat_id=normalized)
     db.add(channel)
     db.commit()
     db.refresh(channel)

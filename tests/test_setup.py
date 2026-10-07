@@ -144,6 +144,46 @@ async def test_callback_selects_candidate(db, admin_user):
         )
     db.refresh(cand)
     assert cand.selected == 1
+    assert get_preview_chat_id(db) == "777"
+
+
+@pytest.mark.asyncio
+async def test_callback_adds_channel_without_web_confirm(db, admin_user):
+    from app.models import Channel
+
+    session = setup_svc.mint_setup_code(db, admin_user.id)
+    setup_svc.pair_session(db, session, "777")
+    cand = setup_svc.upsert_candidate(
+        db,
+        session=session,
+        kind="channel",
+        chat_id="-100123",
+        title="News",
+        username="newsroom",
+    )
+    with (
+        patch("app.telegram_updates._answer_callback", new_callable=AsyncMock),
+        patch("app.telegram_updates._edit_message", new_callable=AsyncMock),
+    ):
+        await process_update(
+            db,
+            {
+                "update_id": 4,
+                "callback_query": {
+                    "id": "cb2",
+                    "data": f"sel:channel:{cand.id}",
+                    "from": {"id": 777},
+                    "message": {
+                        "message_id": 6,
+                        "chat": {"id": 777, "type": "private"},
+                    },
+                },
+            },
+        )
+    db.refresh(cand)
+    assert cand.selected == 1
+    ch = db.query(Channel).filter(Channel.chat_id == "@newsroom").one()
+    assert ch.name == "News"
 
 
 def test_setup_page_requires_login(client):
@@ -259,6 +299,80 @@ def test_setup_lookup_channel_adds(auth_client, db, monkeypatch):
     assert ch.name == "News"
 
 
+def test_setup_lookup_uses_existing(auth_client, db, monkeypatch):
+    from app.services.channels import create_channel
+
+    create_channel(db, "News", "@newsroom")
+
+    async def fake_lookup(query, bot_token):
+        return (
+            True,
+            "OK — News (@newsroom)",
+            {
+                "chat_id": "@newsroom",
+                "numeric_id": "-100123",
+                "title": "News",
+                "username": "newsroom",
+                "type": "channel",
+            },
+        )
+
+    async def fake_username(db_):
+        return "mybot"
+
+    monkeypatch.setattr(
+        "app.routers.setup_routes.channels_svc.lookup_chat", fake_lookup
+    )
+    monkeypatch.setattr("app.routers.setup_routes.fetch_bot_username", fake_username)
+    r = auth_client.post(
+        "/setup/channels/lookup",
+        data={"query": "@newsroom"},
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+    assert "Using+existing" in r.headers["location"] or "Using%20existing" in r.headers["location"]
+    from app.models import Channel
+
+    assert db.query(Channel).count() == 1
+
+
+def test_setup_add_uses_existing_channel(auth_client, db, admin_user, monkeypatch):
+    from app.services.channels import create_channel
+
+    create_channel(db, "News", "@newsroom")
+
+    async def fake_username(db_):
+        return "mybot"
+
+    async def fake_verify(chat_id, bot_token):
+        return True, "OK"
+
+    monkeypatch.setattr("app.routers.setup_routes.fetch_bot_username", fake_username)
+    monkeypatch.setattr(
+        "app.routers.setup_routes.channels_svc.verify_chat_id", fake_verify
+    )
+    auth_client.get("/setup")
+    session = setup_svc.get_active_session_for_user(db, admin_user.id)
+    cand = setup_svc.upsert_candidate(
+        db,
+        session=session,
+        kind="channel",
+        chat_id="-100999",
+        title="News",
+        username="newsroom",
+    )
+    r = auth_client.post(
+        "/setup/channels/add",
+        data={"candidate_id": str(cand.id)},
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+    assert "Using+existing" in r.headers["location"] or "Using%20existing" in r.headers["location"]
+    from app.models import Channel
+
+    assert db.query(Channel).count() == 1
+
+
 def test_setup_test_preview_sends(auth_client, db, monkeypatch):
     set_preview_chat_id(db, "888")
     calls = []
@@ -276,18 +390,31 @@ def test_setup_test_preview_sends(auth_client, db, monkeypatch):
     assert calls == [("888", "Setup OK — Telebot can DM you.")]
 
 
-def test_setup_reset_clears_pairing_and_preview(auth_client, db, admin_user, monkeypatch):
+def test_setup_reset_clears_pairing_preview_and_user(auth_client, db, admin_user, monkeypatch):
     async def fake_username(db_):
         return "mybot"
 
     monkeypatch.setattr("app.routers.setup_routes.fetch_bot_username", fake_username)
     set_preview_chat_id(db, "555")
+    from app.settings_store import get_setting, set_setting
+    from app.telegram_user import (
+        KEY_API_HASH,
+        KEY_API_ID,
+        KEY_USER_DISPLAY,
+        KEY_USER_SESSION,
+        api_credentials_configured,
+        get_user_session,
+        set_api_credentials,
+    )
+
+    set_api_credentials(db, "39208283", "abcdefghijklmnop")
+    set_setting(db, KEY_USER_SESSION, "sess")
+    set_setting(db, KEY_USER_DISPLAY, "C")
     session = setup_svc.mint_setup_code(db, admin_user.id)
     setup_svc.pair_session(db, session, "555")
     setup_svc.upsert_candidate(
         db, session=session, kind="preview", chat_id="555", title="Bob"
     )
-    old_id = session.id
     old_code = session.code
 
     r = auth_client.post("/setup/reset", follow_redirects=False)
@@ -299,6 +426,11 @@ def test_setup_reset_clears_pairing_and_preview(auth_client, db, admin_user, mon
 
     db.expire_all()
     assert get_preview_chat_id(db) == ""
+    assert get_user_session(db) == ""
+    assert get_setting(db, KEY_USER_DISPLAY) == ""
+    assert get_setting(db, KEY_API_ID) == ""
+    assert get_setting(db, KEY_API_HASH) == ""
+    assert api_credentials_configured(db) is False
     row = db.get(AppSetting, KEY_PREVIEW_CHAT_ID)
     assert row is not None
     assert row.value == ""

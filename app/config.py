@@ -22,6 +22,9 @@ class Settings:
     media_dir: Path
     data_dir: Path
     telegram_updates_enabled: bool
+    telegram_api_id: int
+    telegram_api_hash: str
+    telegram_session: str
 
 
 @lru_cache
@@ -32,6 +35,11 @@ def get_settings() -> Settings:
         "DATABASE_URL", f"sqlite:///{data_dir / 'telebot.db'}"
     )
     updates_flag = os.environ.get("TELEGRAM_UPDATES_ENABLED", "1").strip().lower()
+    api_id_raw = os.environ.get("TELEGRAM_API_ID", "").strip()
+    try:
+        api_id = int(api_id_raw) if api_id_raw else 0
+    except ValueError:
+        api_id = 0
     return Settings(
         bot_token=os.environ.get("BOT_TOKEN", ""),
         secret_key=os.environ.get("SECRET_KEY", "change-me"),
@@ -43,4 +51,7 @@ def get_settings() -> Settings:
         media_dir=media_dir,
         data_dir=data_dir,
         telegram_updates_enabled=updates_flag not in ("0", "false", "no", "off"),
+        telegram_api_id=api_id,
+        telegram_api_hash=os.environ.get("TELEGRAM_API_HASH", "").strip(),
+        telegram_session=os.environ.get("TELEGRAM_SESSION", "").strip(),
     )

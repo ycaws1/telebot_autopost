@@ -148,7 +148,7 @@ async def handle_message(db, message: dict) -> None:
     await _send_message(
         tg_uid,
         f"Linked to Telebot setup.\nYour chat id: {tg_uid}\n\n"
-        "Tap below to select this as the preview DM, then confirm in the web Setup page.",
+        "Tap below to set this as your preview DM (no need to confirm on the web).",
         reply_markup=_preview_keyboard(cand.id),
     )
 
@@ -191,21 +191,44 @@ async def handle_callback(db, callback: dict) -> None:
 
     if action == "sel":
         setup_svc.select_candidate(db, candidate_id)
-        if cb_id:
-            await _answer_callback(cb_id, "Selected")
-        label = "preview DM" if kind == "preview" else "channel"
-        if chat_id and message_id:
-            await _edit_message(
-                chat_id,
-                message_id,
-                f"Selected as {label}. Confirm Save / Add in the web Setup page.",
-            )
-        # Also notify if selection was for channel and callback came from DM
-        if kind == "channel" and tg_uid and str(chat_id) != tg_uid:
-            await _send_message(
-                tg_uid,
-                f"Selected channel {cand.title or cand.chat_id}. Confirm Add in web Setup.",
-            )
+        if kind == "preview":
+            from app.settings_store import set_preview_chat_id
+
+            set_preview_chat_id(db, cand.chat_id)
+            if cb_id:
+                await _answer_callback(cb_id, "Preview DM saved")
+            if chat_id and message_id:
+                await _edit_message(
+                    chat_id,
+                    message_id,
+                    f"Preview DM saved ({cand.chat_id}). Setup will show it as done.",
+                )
+            return
+
+        if kind == "channel":
+            from app.services import channels as channels_svc
+
+            create_id = f"@{cand.username}" if cand.username else cand.chat_id
+            display = (cand.title or cand.username or cand.chat_id or create_id).strip()
+            existing = channels_svc.find_channel_by_chat_id(db, create_id, cand.chat_id)
+            if existing is None:
+                try:
+                    existing = channels_svc.create_channel(db, display, create_id)
+                except ValueError as exc:
+                    if cb_id:
+                        await _answer_callback(cb_id, str(exc)[:180])
+                    if chat_id and message_id:
+                        await _edit_message(chat_id, message_id, f"Could not add channel: {exc}")
+                    return
+            label = f"{existing.name} ({existing.chat_id})"
+            if cb_id:
+                await _answer_callback(cb_id, "Channel saved")
+            done_text = f"Channel saved: {label}. Setup will show it as in use."
+            if chat_id and message_id:
+                await _edit_message(chat_id, message_id, done_text)
+            if tg_uid and str(chat_id) != tg_uid:
+                await _send_message(tg_uid, done_text)
+            return
 
 
 async def handle_channel_post(db, channel_post: dict) -> None:
@@ -236,7 +259,7 @@ async def handle_channel_post(db, channel_post: dict) -> None:
         await _send_message(
             session.telegram_user_id,
             f"Found channel: {label}\nId: {chat_id}\n\n"
-            "Add the bot as admin (done) and tap to use this for posting.",
+            "Tap below to save it for posting (no need to confirm on the web).",
             reply_markup=_channel_keyboard(cand.id),
         )
 
@@ -261,11 +284,17 @@ async def poll_once(db) -> int:
         offset = int(offset_s or "0")
     except ValueError:
         offset = 0
-    async with httpx.AsyncClient(timeout=35.0) as client:
-        resp = await client.get(
-            f"{_api_base()}/getUpdates",
-            params={"offset": offset, "timeout": 25},
-        )
+    # Long-poll up to 25s; httpx read timeout must be higher or empty waits look like errors.
+    timeout = httpx.Timeout(connect=10.0, read=40.0, write=10.0, pool=10.0)
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        try:
+            resp = await client.get(
+                f"{_api_base()}/getUpdates",
+                params={"offset": offset, "timeout": 25},
+            )
+        except httpx.ReadTimeout:
+            # No updates within the long-poll window; normal, retry next loop.
+            return 0
         body = resp.json()
     if not body.get("ok"):
         logger.warning("getUpdates failed: %s", body.get("description"))

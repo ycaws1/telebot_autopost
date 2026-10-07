@@ -20,6 +20,16 @@ from app.settings_store import (
 )
 from app.telegram_client import TelegramError, send_post
 from app.telegram_updates import fetch_bot_username
+from app.telegram_user import (
+    TelegramUserError,
+    clear_api_credentials,
+    clear_user_session,
+    complete_user_login,
+    get_api_hash,
+    set_api_credentials,
+    start_user_login,
+    user_auth_status,
+)
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -31,6 +41,10 @@ def _require_login(request: Request, db: Session):
 
 def _session_payload(db: Session, user_id: int) -> dict:
     session = setup_svc.get_active_session_for_user(db, user_id)
+    existing_channels = [
+        {"id": ch.id, "name": ch.name, "chat_id": ch.chat_id}
+        for ch in channels_svc.list_channels(db)
+    ]
     candidates = []
     if session:
         for c in (
@@ -39,6 +53,12 @@ def _session_payload(db: Session, user_id: int) -> dict:
             .order_by(SetupCandidate.id.desc())
             .all()
         ):
+            create_id = f"@{c.username}" if c.username else c.chat_id
+            already = (
+                c.kind == "channel"
+                and channels_svc.find_channel_by_chat_id(db, create_id, c.chat_id)
+                is not None
+            )
             candidates.append(
                 {
                     "id": c.id,
@@ -47,6 +67,7 @@ def _session_payload(db: Session, user_id: int) -> dict:
                     "title": c.title,
                     "username": c.username,
                     "selected": bool(c.selected),
+                    "already_added": already,
                 }
             )
     return {
@@ -59,8 +80,10 @@ def _session_payload(db: Session, user_id: int) -> dict:
             "expires_at": session.expires_at.isoformat() if session.expires_at else None,
         },
         "candidates": candidates,
+        "existing_channels": existing_channels,
         "preview_chat_id": get_preview_chat_id(db),
-        "channels_count": db.query(Channel).count(),
+        "channels_count": len(existing_channels),
+        "user_auth": user_auth_status(db),
     }
 
 
@@ -171,7 +194,16 @@ async def setup_add_channel(
     display = (name or cand.title or cand.username or cand.chat_id).strip()
     # Prefer username when available; otherwise normalized numeric id
     create_id = f"@{cand.username}" if cand.username else cand.chat_id
-    channels_svc.create_channel(db, display, create_id)
+    existing = channels_svc.find_channel_by_chat_id(db, create_id, cand.chat_id)
+    if existing is not None:
+        return RedirectResponse(
+            f"/setup?ok={quote('Using existing channel: ' + existing.name + ' (' + existing.chat_id + ')')}",
+            status_code=303,
+        )
+    try:
+        channels_svc.create_channel(db, display, create_id)
+    except ValueError as exc:
+        return RedirectResponse(f"/setup?error={quote(str(exc))}", status_code=303)
     return RedirectResponse(f"/setup?ok={quote(message)}", status_code=303)
 
 
@@ -197,9 +229,30 @@ async def setup_lookup_channel(
         )
         return RedirectResponse(f"/setup?error={quote(hint)}", status_code=303)
     display = (name or info.get("title") or info["chat_id"]).strip()
-    channels_svc.create_channel(db, display, info["chat_id"])
-    # Also stash as candidate when a setup session is active (keeps wizard list in sync)
+    existing = channels_svc.find_channel_by_chat_id(
+        db, info["chat_id"], info.get("numeric_id") or ""
+    )
     session = setup_svc.get_active_session_for_user(db, user.id)
+    if existing is not None:
+        if session is not None:
+            setup_svc.upsert_candidate(
+                db,
+                session=session,
+                kind="channel",
+                chat_id=info.get("numeric_id") or info["chat_id"],
+                title=info.get("title") or existing.name,
+                username=info.get("username"),
+                selected=True,
+            )
+        return RedirectResponse(
+            f"/setup?ok={quote('Using existing channel: ' + existing.name + ' (' + existing.chat_id + ')')}",
+            status_code=303,
+        )
+    try:
+        channels_svc.create_channel(db, display, info["chat_id"])
+    except ValueError as exc:
+        return RedirectResponse(f"/setup?error={quote(str(exc))}", status_code=303)
+    # Also stash as candidate when a setup session is active (keeps wizard list in sync)
     if session is not None:
         setup_svc.upsert_candidate(
             db,
@@ -242,8 +295,91 @@ def setup_reset(request: Request, db: Session = Depends(get_db)):
     if user is None:
         return RedirectResponse("/login", status_code=303)
     clear_preview_chat_id(db)
+    clear_user_session(db)
+    clear_api_credentials(db)
     setup_svc.reset_setup(db, user.id)
     return RedirectResponse(
-        f"/setup?ok={quote('Setup reset. Pair again with the new code. Channels were kept.')}",
+        f"/setup?ok={quote('Setup reset. Enter API credentials, log in, and pair again. Channels were kept.')}",
+        status_code=303,
+    )
+
+
+@router.post("/setup/user/api")
+def setup_user_api(
+    request: Request,
+    api_id: str = Form(...),
+    api_hash: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    user = _require_login(request, db)
+    if user is None:
+        return RedirectResponse("/login", status_code=303)
+    hash_value = (api_hash or "").strip() or get_api_hash(db)
+    try:
+        set_api_credentials(db, api_id, hash_value)
+    except TelegramUserError as exc:
+        return RedirectResponse(f"/setup?error={quote(str(exc))}", status_code=303)
+    return RedirectResponse(
+        f"/setup?ok={quote('API credentials saved. You can log in with your phone.')}",
+        status_code=303,
+    )
+
+
+@router.post("/setup/user/phone")
+async def setup_user_phone(
+    request: Request,
+    phone: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    user = _require_login(request, db)
+    if user is None:
+        return RedirectResponse("/login", status_code=303)
+    try:
+        await start_user_login(db, phone)
+    except TelegramUserError as exc:
+        return RedirectResponse(f"/setup?error={quote(str(exc))}", status_code=303)
+    except Exception as exc:
+        return RedirectResponse(f"/setup?error={quote(str(exc))}", status_code=303)
+    return RedirectResponse(
+        f"/setup?ok={quote('Code sent. Enter it below.')}",
+        status_code=303,
+    )
+
+
+@router.post("/setup/user/code")
+async def setup_user_code(
+    request: Request,
+    code: str = Form(""),
+    password: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    user = _require_login(request, db)
+    if user is None:
+        return RedirectResponse("/login", status_code=303)
+    try:
+        display = await complete_user_login(db, code=code, password=password)
+    except TelegramUserError as exc:
+        if str(exc) == "2FA_REQUIRED":
+            return RedirectResponse(
+                f"/setup?ok={quote('Enter your Telegram 2FA password.')}",
+                status_code=303,
+            )
+        return RedirectResponse(f"/setup?error={quote(str(exc))}", status_code=303)
+    except Exception as exc:
+        return RedirectResponse(f"/setup?error={quote(str(exc))}", status_code=303)
+    return RedirectResponse(
+        f"/setup?ok={quote('User account linked: ' + display)}",
+        status_code=303,
+    )
+
+
+@router.post("/setup/user/logout")
+def setup_user_logout(request: Request, db: Session = Depends(get_db)):
+    user = _require_login(request, db)
+    if user is None:
+        return RedirectResponse("/login", status_code=303)
+    clear_user_session(db)
+    return RedirectResponse(
+        f"/setup?ok={quote('User session cleared. Log in again to publish.')}",
         status_code=303,
     )

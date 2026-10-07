@@ -59,7 +59,10 @@ async def channels_create(
             "or the -100… chat id from @userinfobot / @getidsbot."
         )
         return RedirectResponse(f"/channels?error={quote(detail)}", status_code=303)
-    channels_svc.create_channel(db, name, chat_id)
+    try:
+        channels_svc.create_channel(db, name, chat_id)
+    except ValueError as exc:
+        return RedirectResponse(f"/channels?error={quote(str(exc))}", status_code=303)
     return RedirectResponse(f"/channels?ok={quote(message)}", status_code=303)
 
 

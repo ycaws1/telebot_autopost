@@ -5,7 +5,7 @@ def test_dm_preview_uses_preview_chat_id(auth_client, monkeypatch):
     calls = []
 
     async def fake_send(chat_id, caption, media, **kwargs):
-        calls.append(chat_id)
+        calls.append((chat_id, caption))
 
     monkeypatch.setenv("PREVIEW_CHAT_ID", "424242")
     from app.config import get_settings
@@ -19,7 +19,7 @@ def test_dm_preview_uses_preview_chat_id(auth_client, monkeypatch):
         )
     assert r.status_code == 200
     assert r.json()["ok"] is True
-    assert calls == ["424242"]
+    assert calls == [("424242", "[Preview]\npreview hi")]
 
 
 def test_dm_preview_never_uses_channel(auth_client, db, monkeypatch):

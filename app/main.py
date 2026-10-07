@@ -58,7 +58,7 @@ def dashboard(request: Request, db=Depends(get_db)):
         return RedirectResponse("/login", status_code=303)
     pending = (
         db.query(Post)
-        .filter(Post.status == PostStatus.PENDING)
+        .filter(Post.status.in_([PostStatus.PENDING, PostStatus.POSTING]))
         .order_by(Post.scheduled_at.asc())
         .limit(50)
         .all()

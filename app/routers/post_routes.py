@@ -36,6 +36,13 @@ def _parse_scheduled_at(value: str) -> datetime:
     return parse_local_datetime(value)
 
 
+def _preview_caption(caption: str | None) -> str:
+    body = (caption or "").strip()
+    if not body:
+        return "[Preview]"
+    return f"[Preview]\n{body}"
+
+
 async def _read_uploads(uploads: list[UploadFile]) -> list[tuple[str, bytes, str]]:
     files = []
     for upload in uploads or []:
@@ -158,7 +165,8 @@ async def preview_post(
         if not items and not (caption or "").strip():
             raise TelegramError("caption is required for text-only posts")
 
-        await send_post(preview_chat_id, caption, items)
+        preview_caption = _preview_caption(caption)
+        await send_post(preview_chat_id, preview_caption, items)
     except TelegramError as exc:
         if wants_json:
             return JSONResponse({"ok": False, "error": str(exc)}, status_code=400)

@@ -60,6 +60,28 @@ def test_normalize_chat_id():
     assert normalize_chat_id("1004357582053") == "-1004357582053"
 
 
+def test_create_channel_rejects_duplicate(db):
+    create_channel(db, "Main", "@the_test_channel_2026_yc")
+    with pytest.raises(ValueError, match="already added"):
+        create_channel(db, "Main again", "@The_Test_Channel_2026_YC")
+
+
+def test_create_channel_rejects_duplicate_via_route(auth_client, db):
+    create_channel(db, "Main", "@main")
+    with patch(
+        "app.routers.channel_routes.channels_svc.verify_chat_id",
+        new=AsyncMock(return_value=(True, "OK — Main (@main)")),
+    ):
+        r = auth_client.post(
+            "/channels",
+            data={"name": "Main 2", "chat_id": "@main"},
+            follow_redirects=False,
+        )
+    assert r.status_code == 303
+    assert "already" in r.headers["location"].lower()
+    assert db.query(Channel).count() == 1
+
+
 @pytest.mark.asyncio
 async def test_lookup_chat_returns_info(monkeypatch):
     class FakeResp:

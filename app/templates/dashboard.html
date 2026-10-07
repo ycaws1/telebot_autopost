@@ -23,20 +23,21 @@
 <section class="panel">
   <div class="panel-head">
     <h2>Upcoming queue</h2>
-    <span class="panel-count">{{ pending|length }} pending</span>
+    <span class="panel-count">{{ pending|length }} in queue</span>
   </div>
   <table>
-    <thead><tr><th>When</th><th>Channel</th><th>Caption</th><th></th></tr></thead>
+    <thead><tr><th>When</th><th>Status</th><th>Channel</th><th>Caption</th><th></th></tr></thead>
     <tbody>
     {% for p in pending %}
       <tr>
         <td>{{ format_local_display(p.scheduled_at) }}</td>
+        <td><span class="status-pill status-{{ p.status }}">{{ p.status }}</span></td>
         <td>{{ p.channel.name }}</td>
         <td>{{ (p.caption or '')[:80] }}</td>
         <td><a href="/posts/{{ p.id }}">View</a></td>
       </tr>
     {% else %}
-      <tr class="empty-row"><td colspan="4">No pending posts.</td></tr>
+      <tr class="empty-row"><td colspan="5">No pending posts.</td></tr>
     {% endfor %}
     </tbody>
   </table>
@@ -85,4 +86,16 @@
     </tbody>
   </table>
 </section>
+{% if pending %}
+<p class="page-meta" id="auto-refresh-hint">Auto-refreshing while the queue has pending posts…</p>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if pending %}
+<script>
+  // Scheduler ticks every 30s; refresh often enough to move completed posts into Recent.
+  setTimeout(function () { location.reload(); }, 10000);
+</script>
+{% endif %}
 {% endblock %}

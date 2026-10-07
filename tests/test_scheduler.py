@@ -20,10 +20,10 @@ async def test_due_post_becomes_posted(db):
     )
     sent = []
 
-    async def fake_send(chat_id, caption, media, **kwargs):
+    async def fake_publish(chat_id, caption, media, **kwargs):
         sent.append((chat_id, caption))
 
-    n = await process_due_posts(lambda: db, send=fake_send)
+    n = await process_due_posts(lambda: db, publish=fake_publish)
     assert n == 1
     db.refresh(p)
     assert p.status == PostStatus.POSTED
@@ -45,7 +45,7 @@ async def test_send_failure_marks_failed(db):
     async def boom(*a, **k):
         raise Exception("bot not admin")
 
-    await process_due_posts(lambda: db, send=boom)
+    await process_due_posts(lambda: db, publish=boom)
     db.refresh(p)
     assert p.status == PostStatus.FAILED
     assert "bot not admin" in p.error
@@ -79,8 +79,8 @@ async def test_future_post_not_sent(db):
         files=[],
     )
 
-    async def fake_send(*a, **k):
-        raise AssertionError("should not send")
+    async def fake_publish(*a, **k):
+        raise AssertionError("should not publish")
 
-    n = await process_due_posts(lambda: db, send=fake_send)
+    n = await process_due_posts(lambda: db, publish=fake_publish)
     assert n == 0
