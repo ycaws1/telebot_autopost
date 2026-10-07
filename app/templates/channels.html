@@ -28,6 +28,7 @@
     <h2>Your channels</h2>
     <span class="panel-count">{{ channels|length }}</span>
   </div>
+  <div class="table-scroll">
   <table>
     <thead><tr><th>Name</th><th>Chat ID</th><th></th></tr></thead>
     <tbody>
@@ -55,5 +56,6 @@
     {% endfor %}
     </tbody>
   </table>
+  </div>
 </section>
 {% endblock %}

@@ -25,6 +25,7 @@
     <h2>Upcoming queue</h2>
     <span class="panel-count">{{ pending|length }} in queue</span>
   </div>
+  <div class="table-scroll">
   <table>
     <thead><tr><th>When</th><th>Status</th><th>Channel</th><th>Caption</th><th></th></tr></thead>
     <tbody>
@@ -41,6 +42,7 @@
     {% endfor %}
     </tbody>
   </table>
+  </div>
 </section>
 
 <section class="panel">
@@ -56,6 +58,7 @@
       {% endif %}
     </div>
   </div>
+  <div class="table-scroll">
   <table>
     <thead><tr><th>Status</th><th>Error</th><th>Channel</th><th>Caption</th><th></th></tr></thead>
     <tbody>
@@ -85,6 +88,7 @@
     {% endfor %}
     </tbody>
   </table>
+  </div>
 </section>
 {% if pending %}
 <p class="page-meta" id="auto-refresh-hint">Auto-refreshing while the queue has pending posts…</p>
