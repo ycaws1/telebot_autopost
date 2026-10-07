@@ -1,0 +1,233 @@
+{
+  "schemaVersion": 1,
+  "targets": {
+    "/": {
+      "targetKind": "existing-ui",
+      "projectId": "571b61f5-991e-4c38-a4e3-80d82080e9c8",
+      "baselineDraftId": "2efccf88-60f4-4d7f-b3f1-723dadf1c7f9",
+      "activeDraftId": "129be35a-fdf2-43bc-889e-37d8540aa9c9",
+      "designSystemPath": ".superdesign/design-system.md",
+      "contextFiles": [
+        ".superdesign/design-system.md",
+        ".superdesign/init/theme.md",
+        "app/templates/base.html",
+        "app/templates/dashboard.html",
+        "app/static/styles.css"
+      ],
+      "fingerprints": {
+        ".superdesign/design-system.md": "de24d3f7f4d3ecafd0acff76524e6313b1bb453e2e4132f54e4216a1591be936",
+        ".superdesign/init/theme.md": "4cf38550e00e778693bc0bf4e9069cdfaa61369213dfbd6f68c25d1ec52e7741",
+        "app/templates/base.html": "a926319882970f00dd2f6a699af83caea84054305b1a40165ea0b0bcae0c1295",
+        "app/templates/dashboard.html": "a6e771cc6fd31f412a41bf057fb6dda37490fd6544c3dc8fc3cd9376185c61b4",
+        "app/static/styles.css": "45ff6e24d25b68cab0e7980d1bf92cabc68bb3f0ac2a18cd0e415de0ca52ee8a"
+      },
+      "components": [
+        {
+          "name": "SiteHeader",
+          "id": "84594a44-3073-46d6-8178-86f7d14320b5",
+          "sourcePath": "app/templates/base.html"
+        }
+      ],
+      "drafts": {
+        "2efccf88-60f4-4d7f-b3f1-723dadf1c7f9": {
+          "title": "Current Dashboard",
+          "visualDirection": "current cream/teal serif",
+          "currentVersion": 1
+        },
+        "0f2f5331-a05b-4e55-92f1-dc22aa2d8a37": {
+          "title": "Telegram native \u2014 top nav",
+          "visualDirection": "telegram-desktop top header",
+          "parentDraftId": "2efccf88-60f4-4d7f-b3f1-723dadf1c7f9",
+          "currentVersion": 1
+        },
+        "129be35a-fdf2-43bc-889e-37d8540aa9c9": {
+          "title": "Telegram native \u2014 sidebar",
+          "visualDirection": "telegram-desktop left rail (selected)",
+          "parentDraftId": "2efccf88-60f4-4d7f-b3f1-723dadf1c7f9",
+          "currentVersion": 1
+        }
+      },
+      "updatedAt": "2026-10-05T05:30:48.118676+00:00"
+    },
+    "/login": {
+      "targetKind": "existing-ui",
+      "projectId": "571b61f5-991e-4c38-a4e3-80d82080e9c8",
+      "activeDraftId": "003297df-2c92-4d5e-a5e8-ff17f8505e0b",
+      "sourceTarget": "/",
+      "sourceDraftId": "129be35a-fdf2-43bc-889e-37d8540aa9c9",
+      "designSystemPath": ".superdesign/design-system.md",
+      "contextFiles": [
+        ".superdesign/design-system.md",
+        "app/templates/base.html",
+        "app/static/styles.css",
+        "app/templates/login.html"
+      ],
+      "fingerprints": {
+        ".superdesign/design-system.md": "de24d3f7f4d3ecafd0acff76524e6313b1bb453e2e4132f54e4216a1591be936",
+        "app/templates/base.html": "a926319882970f00dd2f6a699af83caea84054305b1a40165ea0b0bcae0c1295",
+        "app/static/styles.css": "6ba44af6b4ac6cdd6794dddf6221f7f3369e5785d91bec5ac34cf4a31a25e246",
+        "app/templates/login.html": "9353c8e1b52d3c6644ffe49bddcefe5f69745e93464fa5925e57d49e137daa6c"
+      },
+      "components": [
+        {
+          "name": "SiteHeader",
+          "id": "84594a44-3073-46d6-8178-86f7d14320b5",
+          "sourcePath": "app/templates/base.html"
+        }
+      ],
+      "drafts": {
+        "003297df-2c92-4d5e-a5e8-ff17f8505e0b": {
+          "title": "Login",
+          "visualDirection": "telegram-desktop left rail",
+          "parentDraftId": "129be35a-fdf2-43bc-889e-37d8540aa9c9",
+          "currentVersion": 1
+        }
+      },
+      "updatedAt": "2026-10-05T05:30:48.118676+00:00"
+    },
+    "/setup": {
+      "targetKind": "existing-ui",
+      "projectId": "571b61f5-991e-4c38-a4e3-80d82080e9c8",
+      "activeDraftId": "f131ed85-5593-4bae-ac03-e0f7557ba78f",
+      "sourceTarget": "/",
+      "sourceDraftId": "129be35a-fdf2-43bc-889e-37d8540aa9c9",
+      "designSystemPath": ".superdesign/design-system.md",
+      "contextFiles": [
+        ".superdesign/design-system.md",
+        "app/templates/base.html",
+        "app/static/styles.css",
+        "app/templates/setup.html"
+      ],
+      "fingerprints": {
+        ".superdesign/design-system.md": "de24d3f7f4d3ecafd0acff76524e6313b1bb453e2e4132f54e4216a1591be936",
+        "app/templates/base.html": "a926319882970f00dd2f6a699af83caea84054305b1a40165ea0b0bcae0c1295",
+        "app/static/styles.css": "6ba44af6b4ac6cdd6794dddf6221f7f3369e5785d91bec5ac34cf4a31a25e246",
+        "app/templates/setup.html": "9300b4fee830d8329c81786cbb98094857b83830bdc1c860bd07ccb7c67e1c28"
+      },
+      "components": [
+        {
+          "name": "SiteHeader",
+          "id": "84594a44-3073-46d6-8178-86f7d14320b5",
+          "sourcePath": "app/templates/base.html"
+        }
+      ],
+      "drafts": {
+        "f131ed85-5593-4bae-ac03-e0f7557ba78f": {
+          "title": "Setup",
+          "visualDirection": "telegram-desktop left rail",
+          "parentDraftId": "129be35a-fdf2-43bc-889e-37d8540aa9c9",
+          "currentVersion": 1
+        }
+      },
+      "updatedAt": "2026-10-05T05:30:48.118676+00:00"
+    },
+    "/channels": {
+      "targetKind": "existing-ui",
+      "projectId": "571b61f5-991e-4c38-a4e3-80d82080e9c8",
+      "activeDraftId": "636f8b11-96a9-46cf-bb01-38090dd3b02a",
+      "sourceTarget": "/",
+      "sourceDraftId": "129be35a-fdf2-43bc-889e-37d8540aa9c9",
+      "designSystemPath": ".superdesign/design-system.md",
+      "contextFiles": [
+        ".superdesign/design-system.md",
+        "app/templates/base.html",
+        "app/static/styles.css",
+        "app/templates/channels.html"
+      ],
+      "fingerprints": {
+        ".superdesign/design-system.md": "de24d3f7f4d3ecafd0acff76524e6313b1bb453e2e4132f54e4216a1591be936",
+        "app/templates/base.html": "a926319882970f00dd2f6a699af83caea84054305b1a40165ea0b0bcae0c1295",
+        "app/static/styles.css": "6ba44af6b4ac6cdd6794dddf6221f7f3369e5785d91bec5ac34cf4a31a25e246",
+        "app/templates/channels.html": "57a30526b6205b230217def779003cc2b1b54e644fb78554b926d90ffea66ddb"
+      },
+      "components": [
+        {
+          "name": "SiteHeader",
+          "id": "84594a44-3073-46d6-8178-86f7d14320b5",
+          "sourcePath": "app/templates/base.html"
+        }
+      ],
+      "drafts": {
+        "636f8b11-96a9-46cf-bb01-38090dd3b02a": {
+          "title": "Channels",
+          "visualDirection": "telegram-desktop left rail",
+          "parentDraftId": "129be35a-fdf2-43bc-889e-37d8540aa9c9",
+          "currentVersion": 1
+        }
+      },
+      "updatedAt": "2026-10-05T05:30:48.118676+00:00"
+    },
+    "/posts/new": {
+      "targetKind": "existing-ui",
+      "projectId": "571b61f5-991e-4c38-a4e3-80d82080e9c8",
+      "activeDraftId": "2445e414-2c2b-4593-9da1-f78ee4101b47",
+      "sourceTarget": "/",
+      "sourceDraftId": "129be35a-fdf2-43bc-889e-37d8540aa9c9",
+      "designSystemPath": ".superdesign/design-system.md",
+      "contextFiles": [
+        ".superdesign/design-system.md",
+        "app/templates/base.html",
+        "app/static/styles.css",
+        "app/templates/post_form.html"
+      ],
+      "fingerprints": {
+        ".superdesign/design-system.md": "de24d3f7f4d3ecafd0acff76524e6313b1bb453e2e4132f54e4216a1591be936",
+        "app/templates/base.html": "a926319882970f00dd2f6a699af83caea84054305b1a40165ea0b0bcae0c1295",
+        "app/static/styles.css": "6ba44af6b4ac6cdd6794dddf6221f7f3369e5785d91bec5ac34cf4a31a25e246",
+        "app/templates/post_form.html": "b913e816c2072a480931008770d7bfd8d632929fa05e29f6350480b06c47f859"
+      },
+      "components": [
+        {
+          "name": "SiteHeader",
+          "id": "84594a44-3073-46d6-8178-86f7d14320b5",
+          "sourcePath": "app/templates/base.html"
+        }
+      ],
+      "drafts": {
+        "2445e414-2c2b-4593-9da1-f78ee4101b47": {
+          "title": "New post",
+          "visualDirection": "telegram-desktop left rail",
+          "parentDraftId": "129be35a-fdf2-43bc-889e-37d8540aa9c9",
+          "currentVersion": 1
+        }
+      },
+      "updatedAt": "2026-10-05T05:30:48.118676+00:00"
+    },
+    "/posts/{id}": {
+      "targetKind": "existing-ui",
+      "projectId": "571b61f5-991e-4c38-a4e3-80d82080e9c8",
+      "activeDraftId": "7a749a03-ae55-4a6e-b0d3-0d81890adf2f",
+      "sourceTarget": "/",
+      "sourceDraftId": "129be35a-fdf2-43bc-889e-37d8540aa9c9",
+      "designSystemPath": ".superdesign/design-system.md",
+      "contextFiles": [
+        ".superdesign/design-system.md",
+        "app/templates/base.html",
+        "app/static/styles.css",
+        "app/templates/post_detail.html"
+      ],
+      "fingerprints": {
+        ".superdesign/design-system.md": "de24d3f7f4d3ecafd0acff76524e6313b1bb453e2e4132f54e4216a1591be936",
+        "app/templates/base.html": "a926319882970f00dd2f6a699af83caea84054305b1a40165ea0b0bcae0c1295",
+        "app/static/styles.css": "6ba44af6b4ac6cdd6794dddf6221f7f3369e5785d91bec5ac34cf4a31a25e246",
+        "app/templates/post_detail.html": "fdcab4bbc974ae284c803b827ce26246ed96123dc4c018979b8921124abe699c"
+      },
+      "components": [
+        {
+          "name": "SiteHeader",
+          "id": "84594a44-3073-46d6-8178-86f7d14320b5",
+          "sourcePath": "app/templates/base.html"
+        }
+      ],
+      "drafts": {
+        "7a749a03-ae55-4a6e-b0d3-0d81890adf2f": {
+          "title": "Post detail",
+          "visualDirection": "telegram-desktop left rail",
+          "parentDraftId": "129be35a-fdf2-43bc-889e-37d8540aa9c9",
+          "currentVersion": 1
+        }
+      },
+      "updatedAt": "2026-10-05T05:30:48.118676+00:00"
+    }
+  }
+}

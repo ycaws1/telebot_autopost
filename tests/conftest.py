@@ -17,6 +17,7 @@ def tmp_db(tmp_path, monkeypatch):
     monkeypatch.setenv("ADMIN_USERNAME", "admin")
     monkeypatch.setenv("ADMIN_PASSWORD", "secret")
     monkeypatch.setenv("PREVIEW_CHAT_ID", "1")
+    monkeypatch.setenv("TELEGRAM_UPDATES_ENABLED", "0")
     get_settings.cache_clear()
     reset_engine()
     init_db()

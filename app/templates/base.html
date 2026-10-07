@@ -6,23 +6,38 @@
   <title>{% block title %}Telebot{% endblock %}</title>
   <link rel="stylesheet" href="/static/styles.css">
 </head>
-<body>
-  <header class="site-header">
-    <a class="brand" href="/">Telebot</a>
-    {% if user is defined and user %}
-    <nav>
-      <a href="/">Dashboard</a>
-      <a href="/channels">Channels</a>
-      <a href="/posts/new">New post</a>
-      <form action="/logout" method="post" class="inline">
-        <button type="submit">Log out</button>
-      </form>
-    </nav>
-    {% endif %}
-  </header>
-  <main>
-    {% block content %}{% endblock %}
-  </main>
+{% set path = request.url.path %}
+{% set logged_in = user is defined and user and not path.startswith('/login') %}
+<body class="{% if not logged_in %}auth-page{% endif %}">
+  {% if logged_in %}
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <a class="brand" href="/"><span class="brand-mark">T</span> Telebot</a>
+      </div>
+      <nav class="sidebar-nav">
+        <a class="sidebar-link {% if path == '/' %}active{% endif %}" href="/">Dashboard</a>
+        <a class="sidebar-link {% if path.startswith('/setup') %}active{% endif %}" href="/setup">Setup</a>
+        <a class="sidebar-link {% if path.startswith('/channels') %}active{% endif %}" href="/channels">Channels</a>
+        <a class="sidebar-link {% if path == '/posts/new' or path.endswith('/edit') %}active{% endif %}" href="/posts/new">New post</a>
+      </nav>
+      <div class="sidebar-footer">
+        <form action="/logout" method="post" class="inline">
+          <button type="submit">Log out</button>
+        </form>
+      </div>
+    </aside>
+    <main class="main-content">
+      <div class="content-inner">
+  {% endif %}
+
+  {% block content %}{% endblock %}
+
+  {% if logged_in %}
+      </div>
+    </main>
+  </div>
+  {% endif %}
   {% block scripts %}{% endblock %}
 </body>
 </html>

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shutil
 from datetime import datetime
 from pathlib import Path
 
@@ -7,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.models import Channel, Post, PostMedia, PostStatus
+from app.timeutil import to_utc
 
 PHOTO_EXT = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 VIDEO_EXT = {".mp4", ".mov", ".m4v"}
@@ -49,7 +51,7 @@ def create_post(
     post = Post(
         channel_id=channel_id,
         caption=caption_clean or None,
-        scheduled_at=scheduled_at,
+        scheduled_at=to_utc(scheduled_at),
         status=PostStatus.PENDING,
     )
     db.add(post)
@@ -95,7 +97,7 @@ def update_post(
     if caption is not None:
         post.caption = caption.strip() or None
     if scheduled_at is not None:
-        post.scheduled_at = scheduled_at
+        post.scheduled_at = to_utc(scheduled_at)
 
     existing = list(post.media)
     if keep_media_ids is not None:
@@ -162,3 +164,71 @@ def retry_post(db: Session, post_id: int) -> Post:
     db.commit()
     db.refresh(post)
     return post
+
+
+def requeue_post(db: Session, post_id: int) -> Post:
+    """Clone a posted/cancelled post into a new pending queue item; keep history row."""
+    from datetime import datetime, timezone
+
+    post = get_post(db, post_id)
+    if post.status not in (PostStatus.POSTED, PostStatus.CANCELLED):
+        raise ValueError("Only posted or cancelled posts can be requeued")
+
+    new_post = Post(
+        channel_id=post.channel_id,
+        caption=post.caption,
+        scheduled_at=datetime.now(timezone.utc),
+        status=PostStatus.PENDING,
+        error=None,
+        attempt_count=0,
+        posted_at=None,
+    )
+    db.add(new_post)
+    db.flush()
+
+    media_root = get_settings().media_dir / str(new_post.id)
+    media_root.mkdir(parents=True, exist_ok=True)
+    for m in sorted(post.media, key=lambda x: x.sort_order):
+        src = Path(m.media_path)
+        dest = media_root / Path(m.media_path).name
+        if src.is_file():
+            dest.write_bytes(src.read_bytes())
+        db.add(
+            PostMedia(
+                post_id=new_post.id,
+                media_type=m.media_type,
+                media_path=str(dest),
+                sort_order=m.sort_order,
+            )
+        )
+
+    db.commit()
+    db.refresh(new_post)
+    return new_post
+
+
+def clear_history(db: Session) -> int:
+    """Delete posted/failed/cancelled posts (and media files). Leaves pending/posting."""
+    history = (
+        db.query(Post)
+        .filter(
+            Post.status.in_(
+                [PostStatus.POSTED, PostStatus.FAILED, PostStatus.CANCELLED]
+            )
+        )
+        .all()
+    )
+    count = 0
+    for post in history:
+        media_dir = get_settings().media_dir / str(post.id)
+        for m in list(post.media):
+            path = Path(m.media_path)
+            if path.is_file():
+                path.unlink(missing_ok=True)
+            db.delete(m)
+        db.delete(post)
+        if media_dir.is_dir():
+            shutil.rmtree(media_dir, ignore_errors=True)
+        count += 1
+    db.commit()
+    return count

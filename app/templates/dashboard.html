@@ -1,40 +1,88 @@
 {% extends "base.html" %}
 {% block title %}Dashboard — Telebot{% endblock %}
 {% block content %}
-<h1>Dashboard</h1>
-<p>Signed in as {{ user.username }}</p>
+<div class="page-header">
+  <div>
+    <h1>Dashboard</h1>
+    <p class="page-meta">Signed in as <strong>{{ user.username }}</strong></p>
+  </div>
+  <a class="btn-primary" href="/posts/new">Schedule post</a>
+</div>
 
-<h2>Upcoming</h2>
-<table>
-  <thead><tr><th>When</th><th>Channel</th><th>Caption</th><th></th></tr></thead>
-  <tbody>
-  {% for p in pending %}
-    <tr>
-      <td>{{ p.scheduled_at }}</td>
-      <td>{{ p.channel.name }}</td>
-      <td>{{ (p.caption or '')[:80] }}</td>
-      <td><a href="/posts/{{ p.id }}">View</a></td>
-    </tr>
-  {% else %}
-    <tr><td colspan="4">No pending posts.</td></tr>
-  {% endfor %}
-  </tbody>
-</table>
+{% if flash_ok %}<p class="flash ok">{{ flash_ok }}</p>{% endif %}
+{% if setup_incomplete %}
+<div class="banner-soft">
+  Setup incomplete:
+  {% if not preview_ok %}preview chat not set{% endif %}
+  {% if not preview_ok and not channels_ok %} · {% endif %}
+  {% if not channels_ok %}no channels yet{% endif %}.
+  <a href="/setup">Open Setup wizard</a>
+</div>
+{% endif %}
 
-<h2>Recent</h2>
-<table>
-  <thead><tr><th>Status</th><th>Channel</th><th>Caption</th><th></th></tr></thead>
-  <tbody>
-  {% for p in recent %}
-    <tr>
-      <td>{{ p.status }}</td>
-      <td>{{ p.channel.name }}</td>
-      <td>{{ (p.caption or '')[:80] }}</td>
-      <td><a href="/posts/{{ p.id }}">View</a></td>
-    </tr>
-  {% else %}
-    <tr><td colspan="4">Nothing yet.</td></tr>
-  {% endfor %}
-  </tbody>
-</table>
+<section class="panel">
+  <div class="panel-head">
+    <h2>Upcoming queue</h2>
+    <span class="panel-count">{{ pending|length }} pending</span>
+  </div>
+  <table>
+    <thead><tr><th>When</th><th>Channel</th><th>Caption</th><th></th></tr></thead>
+    <tbody>
+    {% for p in pending %}
+      <tr>
+        <td>{{ format_local_display(p.scheduled_at) }}</td>
+        <td>{{ p.channel.name }}</td>
+        <td>{{ (p.caption or '')[:80] }}</td>
+        <td><a href="/posts/{{ p.id }}">View</a></td>
+      </tr>
+    {% else %}
+      <tr class="empty-row"><td colspan="4">No pending posts.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<section class="panel">
+  <div class="panel-head">
+    <h2>Recent</h2>
+    <div class="panel-head-actions">
+      <span class="panel-count">{{ recent|length }}</span>
+      {% if recent %}
+      <form method="post" action="/posts/history/clear" class="inline"
+            onsubmit="return confirm('Clear history? This permanently deletes posted, failed, and cancelled posts (pending queue is kept).');">
+        <button type="submit" class="danger-btn">Clear history</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+  <table>
+    <thead><tr><th>Status</th><th>Error</th><th>Channel</th><th>Caption</th><th></th></tr></thead>
+    <tbody>
+    {% for p in recent %}
+      <tr class="{% if p.status == 'failed' %}row-failed{% endif %}">
+        <td><span class="status-pill status-{{ p.status }}">{{ p.status }}</span></td>
+        <td class="error-cell">{% if p.error %}{{ p.error }}{% else %}—{% endif %}</td>
+        <td>{{ p.channel.name }}</td>
+        <td>{{ (p.caption or '')[:80] }}</td>
+        <td class="actions-cell">
+          <a href="/posts/{{ p.id }}">View</a>
+          {% if p.status in ['posted', 'cancelled'] %}
+          <form class="inline" method="post" action="/posts/{{ p.id }}/requeue">
+            <input type="hidden" name="next" value="/">
+            <button type="submit">Requeue</button>
+          </form>
+          {% elif p.status == 'failed' %}
+          <form class="inline" method="post" action="/posts/{{ p.id }}/retry">
+            <input type="hidden" name="next" value="/">
+            <button type="submit">Retry</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+    {% else %}
+      <tr class="empty-row"><td colspan="5">Nothing yet.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
 {% endblock %}

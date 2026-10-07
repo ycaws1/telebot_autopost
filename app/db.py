@@ -46,6 +46,18 @@ def init_db() -> None:
     reset_engine()
     eng = engine()
     Base.metadata.create_all(bind=eng)
+    _migrate_sqlite(eng)
+
+
+def _migrate_sqlite(eng: Engine) -> None:
+    """Add columns introduced after initial create_all (SQLite has no auto-migrate)."""
+    with eng.begin() as conn:
+        rows = conn.exec_driver_sql("PRAGMA table_info(posts)").fetchall()
+        cols = {row[1] for row in rows}
+        if "attempt_count" not in cols:
+            conn.exec_driver_sql(
+                "ALTER TABLE posts ADD COLUMN attempt_count INTEGER NOT NULL DEFAULT 0"
+            )
 
 
 def get_db() -> Generator[Session, None, None]:

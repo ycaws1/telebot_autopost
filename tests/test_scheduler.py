@@ -49,6 +49,7 @@ async def test_send_failure_marks_failed(db):
     db.refresh(p)
     assert p.status == PostStatus.FAILED
     assert "bot not admin" in p.error
+    assert p.attempt_count == 1
 
 
 def test_reset_stuck_posting(db):

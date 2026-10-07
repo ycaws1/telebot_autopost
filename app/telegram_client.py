@@ -104,13 +104,16 @@ async def _post_multipart(client, url: str, data: dict, files: dict) -> None:
 
 
 def _raise_if_bad(resp) -> None:
-    try:
-        resp.raise_for_status()
-    except Exception as exc:
-        raise TelegramError(str(exc)) from exc
+    body = None
     try:
         body = resp.json()
     except Exception:
-        return
+        body = None
     if isinstance(body, dict) and body.get("ok") is False:
         raise TelegramError(body.get("description") or "Telegram API error")
+    status = getattr(resp, "status_code", None)
+    if status is not None and status >= 400:
+        detail = ""
+        if isinstance(body, dict):
+            detail = body.get("description") or ""
+        raise TelegramError(detail or f"Telegram HTTP {status}")

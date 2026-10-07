@@ -12,9 +12,12 @@ from app.auth import bootstrap_admin, get_current_user
 from app.config import get_settings
 from app import db as dbmod
 from app.db import get_db, init_db
-from app.models import Post, PostStatus
-from app.routers import auth_routes, channel_routes, post_routes
+from app.models import Channel, Post, PostStatus
+from app.routers import auth_routes, channel_routes, post_routes, setup_routes
 from app.scheduler import reset_stuck_posting, start_scheduler, stop_scheduler
+from app.settings_store import get_preview_chat_id
+from app.telegram_updates import start_updates_poller, stop_updates_poller
+from app.timeutil import format_local_display, format_local_input
 
 
 @asynccontextmanager
@@ -29,7 +32,9 @@ async def lifespan(app: FastAPI):
     finally:
         db.close()
     start_scheduler()
+    start_updates_poller()
     yield
+    await stop_updates_poller()
     stop_scheduler()
 
 
@@ -39,8 +44,11 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 app.include_router(auth_routes.router)
 app.include_router(channel_routes.router)
 app.include_router(post_routes.router)
+app.include_router(setup_routes.router)
 
 templates = Jinja2Templates(directory="app/templates")
+templates.env.globals["format_local_display"] = format_local_display
+templates.env.globals["format_local_input"] = format_local_input
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -62,8 +70,19 @@ def dashboard(request: Request, db=Depends(get_db)):
         .limit(50)
         .all()
     )
+    preview_ok = bool(get_preview_chat_id(db))
+    channels_ok = db.query(Channel).count() > 0
     return templates.TemplateResponse(
         request,
         "dashboard.html",
-        {"request": request, "user": user, "pending": pending, "recent": recent},
+        {
+            "request": request,
+            "user": user,
+            "pending": pending,
+            "recent": recent,
+            "setup_incomplete": not (preview_ok and channels_ok),
+            "preview_ok": preview_ok,
+            "channels_ok": channels_ok,
+            "flash_ok": request.query_params.get("ok"),
+        },
     )

@@ -21,6 +21,7 @@ class Settings:
     database_url: str
     media_dir: Path
     data_dir: Path
+    telegram_updates_enabled: bool
 
 
 @lru_cache
@@ -30,6 +31,7 @@ def get_settings() -> Settings:
     database_url = os.environ.get(
         "DATABASE_URL", f"sqlite:///{data_dir / 'telebot.db'}"
     )
+    updates_flag = os.environ.get("TELEGRAM_UPDATES_ENABLED", "1").strip().lower()
     return Settings(
         bot_token=os.environ.get("BOT_TOKEN", ""),
         secret_key=os.environ.get("SECRET_KEY", "change-me"),
@@ -40,4 +42,5 @@ def get_settings() -> Settings:
         database_url=database_url,
         media_dir=media_dir,
         data_dir=data_dir,
+        telegram_updates_enabled=updates_flag not in ("0", "false", "no", "off"),
     )

@@ -1,0 +1,199 @@
+{% extends "base.html" %}
+{% block title %}Setup — Telebot{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Telegram setup</h1>
+    <p class="page-meta">Pair the bot, save a preview DM, then discover channels</p>
+  </div>
+</div>
+
+{% if flash_ok %}<p class="flash ok">{{ flash_ok }}</p>{% endif %}
+{% if flash_error %}<p class="flash error">{{ flash_error }}</p>{% endif %}
+
+<section class="setup-step" id="step-pair">
+  <h2>1. Pair with Telegram</h2>
+  {% if bot_username %}
+  <p>Bot: <strong>@{{ bot_username }}</strong></p>
+  {% else %}
+  <p class="error">Could not load bot username. Check <code>BOT_TOKEN</code>.</p>
+  {% endif %}
+  <p>Open this link on your phone, or send <code>/start {{ session.code if session else '' }}</code> to the bot:</p>
+  {% if deep_link %}
+  <p><a class="deep-link" href="{{ deep_link }}" target="_blank" rel="noopener">{{ deep_link }}</a></p>
+  {% endif %}
+  <p>Code: <code class="setup-code" id="setup-code">{{ session.code if session else '------' }}</code>
+    <span id="pair-status" class="hint">{% if session and session.status == 'paired' %}Paired ✓{% else %}Waiting for /start…{% endif %}</span>
+  </p>
+  <form action="/setup/code" method="post" class="inline">
+    <button type="submit" class="secondary">New code</button>
+  </form>
+</section>
+
+<section class="setup-step" id="step-preview">
+  <h2>2. Preview chat</h2>
+  <p class="hint">After pairing, tap <em>Use as my preview DM</em> in Telegram, then save here. Current: <code id="current-preview">{{ preview_chat_id or '(not set)' }}</code></p>
+  <ul id="preview-candidates" class="candidate-list">
+    {% for c in candidates if c.kind == 'preview' %}
+    <li class="{% if c.selected %}selected{% endif %}">
+      <span>{{ c.title or c.chat_id }}{% if c.username %} (@{{ c.username }}){% endif %} — <code>{{ c.chat_id }}</code></span>
+      <form action="/setup/preview/save" method="post" class="inline">
+        <input type="hidden" name="candidate_id" value="{{ c.id }}">
+        <button type="submit">Save preview chat</button>
+      </form>
+    </li>
+    {% else %}
+    <li class="empty-hint" id="preview-empty">No preview candidates yet.</li>
+    {% endfor %}
+  </ul>
+  {% if preview_chat_id %}
+  <form action="/setup/test-preview" method="post">
+    <button type="submit" class="secondary">Send test DM</button>
+  </form>
+  {% endif %}
+</section>
+
+<section class="setup-step" id="step-channels">
+  <h2>3. Channels</h2>
+  <p class="hint">The bot must be a channel <strong>admin</strong> (post messages) before it can send. Pick a discovery method:</p>
+
+  <div class="lookup-box">
+    <h3 class="lookup-title">Look up by @username or id</h3>
+    <p class="hint">Public channels: enter <code>@channelname</code>. Private: use the <code>-100…</code> id. Telegram cannot find channels by display title alone.</p>
+    <form action="/setup/channels/lookup" method="post" class="lookup-form">
+      <label>Username or chat id
+        <input name="query" required placeholder="@mychannel or -100123…">
+      </label>
+      <label>Display name (optional)
+        <input name="name" placeholder="Shown in Telebot">
+      </label>
+      <button type="submit">Look up and add</button>
+    </form>
+  </div>
+
+  <h3 class="lookup-title">Or discover by posting</h3>
+  <ol class="hint">
+    <li>Add the bot as an <strong>admin</strong> of your channel.</li>
+    <li>Post any message in that channel.</li>
+    <li>Tap <em>Add as posting channel</em> in the bot DM, then confirm here.</li>
+  </ol>
+  <ul id="channel-candidates" class="candidate-list">
+    {% for c in candidates if c.kind == 'channel' %}
+    <li class="{% if c.selected %}selected{% endif %}">
+      <span>{{ c.title or c.chat_id }}{% if c.username %} (@{{ c.username }}){% endif %} — <code>{{ c.chat_id }}</code></span>
+      <form action="/setup/channels/add" method="post" class="inline field-row">
+        <input type="hidden" name="candidate_id" value="{{ c.id }}">
+        <input type="text" name="name" placeholder="Display name" value="{{ c.title or '' }}">
+        <button type="submit">Add channel</button>
+      </form>
+    </li>
+    {% else %}
+    <li class="empty-hint" id="channel-empty">No channels discovered from posts yet.</li>
+    {% endfor %}
+  </ul>
+</section>
+
+<section class="setup-step" id="step-done">
+  <h2>4. Done</h2>
+  <ul class="checklist">
+    <li id="check-preview">{% if preview_chat_id %}✓{% else %}○{% endif %} Preview chat set</li>
+    <li id="check-channels">{% if channels_count %}✓{% else %}○{% endif %} At least one channel ({{ channels_count }})</li>
+  </ul>
+  <p><a href="/">Dashboard</a> · <a href="/posts/new">New post</a> · <a href="/channels">Channels</a></p>
+  <form action="/setup/reset" method="post" class="reset-setup"
+        onsubmit="return confirm('Reset setup? This clears pairing and the saved preview chat. Channels are kept.');">
+    <button type="submit" class="danger-btn">Reset setup</button>
+  </form>
+  <p class="hint">Reset clears pairing and preview chat so you can start over. Existing channels stay (manage them on the Channels page).</p>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  const previewList = document.getElementById("preview-candidates");
+  const channelList = document.getElementById("channel-candidates");
+  const pairStatus = document.getElementById("pair-status");
+  const setupCode = document.getElementById("setup-code");
+  const currentPreview = document.getElementById("current-preview");
+  const checkPreview = document.getElementById("check-preview");
+  const checkChannels = document.getElementById("check-channels");
+
+  function esc(s) {
+    return String(s ?? "").replace(/[&<>"']/g, (ch) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch])
+    );
+  }
+
+  function renderCandidates(listEl, items, kind) {
+    const filtered = items.filter((c) => c.kind === kind);
+    if (!filtered.length) {
+      listEl.innerHTML =
+        kind === "preview"
+          ? '<li class="empty-hint">No preview candidates yet.</li>'
+          : '<li class="empty-hint">No channels discovered yet.</li>';
+      return;
+    }
+    listEl.innerHTML = filtered
+      .map((c) => {
+        const label =
+          esc(c.title || c.chat_id) +
+          (c.username ? " (@" + esc(c.username) + ")" : "") +
+          " — <code>" +
+          esc(c.chat_id) +
+          "</code>";
+        if (kind === "preview") {
+          return (
+            '<li class="' +
+            (c.selected ? "selected" : "") +
+            '"><span>' +
+            label +
+            '</span><form action="/setup/preview/save" method="post" class="inline">' +
+            '<input type="hidden" name="candidate_id" value="' +
+            c.id +
+            '"><button type="submit">Save preview chat</button></form></li>'
+          );
+        }
+        return (
+          '<li class="' +
+          (c.selected ? "selected" : "") +
+          '"><span>' +
+          label +
+          '</span><form action="/setup/channels/add" method="post" class="inline field-row">' +
+          '<input type="hidden" name="candidate_id" value="' +
+          c.id +
+          '"><input type="text" name="name" placeholder="Display name" value="' +
+          esc(c.title || "") +
+          '"><button type="submit">Add channel</button></form></li>'
+        );
+      })
+      .join("");
+  }
+
+  async function poll() {
+    try {
+      const r = await fetch("/setup/status", { headers: { Accept: "application/json" } });
+      if (!r.ok) return;
+      const data = await r.json();
+      if (data.session) {
+        setupCode.textContent = data.session.code;
+        pairStatus.textContent =
+          data.session.status === "paired" ? "Paired ✓" : "Waiting for /start…";
+      }
+      renderCandidates(previewList, data.candidates || [], "preview");
+      renderCandidates(channelList, data.candidates || [], "channel");
+      currentPreview.textContent = data.preview_chat_id || "(not set)";
+      checkPreview.textContent = (data.preview_chat_id ? "✓" : "○") + " Preview chat set";
+      checkChannels.textContent =
+        (data.channels_count ? "✓" : "○") +
+        " At least one channel (" +
+        (data.channels_count || 0) +
+        ")";
+    } catch (e) {
+      /* ignore transient poll errors */
+    }
+  }
+  setInterval(poll, 2500);
+})();
+</script>
+{% endblock %}

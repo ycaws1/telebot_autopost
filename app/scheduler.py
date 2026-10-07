@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.models import Post, PostStatus
 from app.telegram_client import MediaItem, send_post as default_send
+from app.timeutil import assume_utc
 
 _scheduler: AsyncIOScheduler | None = None
 
@@ -19,6 +20,10 @@ def reset_stuck_posting(db: Session) -> int:
         post.status = PostStatus.PENDING
     db.commit()
     return len(rows)
+
+
+def _is_due(post: Post, now: datetime) -> bool:
+    return assume_utc(post.scheduled_at) <= now
 
 
 async def process_due_posts(
@@ -34,13 +39,16 @@ async def process_due_posts(
     db = db_factory()
     while True:
         now = datetime.now(timezone.utc)
-        post = (
+        # Fetch pending oldest-first, then filter due in Python so SQLite
+        # naive/aware comparison cannot treat local wall-clock as UTC.
+        candidates = (
             db.query(Post)
             .options(joinedload(Post.channel), joinedload(Post.media))
-            .filter(Post.status == PostStatus.PENDING, Post.scheduled_at <= now)
+            .filter(Post.status == PostStatus.PENDING)
             .order_by(Post.scheduled_at.asc())
-            .first()
+            .all()
         )
+        post = next((p for p in candidates if _is_due(p, now)), None)
         if post is None:
             break
 
@@ -63,6 +71,7 @@ async def process_due_posts(
         except Exception as exc:
             post.status = PostStatus.FAILED
             post.error = str(exc)
+            post.attempt_count = int(post.attempt_count or 0) + 1
         db.commit()
         processed += 1
     return processed
