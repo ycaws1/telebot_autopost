@@ -3,9 +3,10 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from sqlalchemy import text
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.auth import bootstrap_admin, get_current_user
@@ -49,6 +50,19 @@ app.include_router(setup_routes.router)
 templates = Jinja2Templates(directory="app/templates")
 templates.env.globals["format_local_display"] = format_local_display
 templates.env.globals["format_local_input"] = format_local_input
+
+
+@app.get("/health")
+def health(db=Depends(get_db)):
+    """Unauthenticated liveness/readiness probe for hosts (e.g. Render)."""
+    try:
+        db.execute(text("SELECT 1"))
+    except Exception as exc:
+        return JSONResponse(
+            {"ok": False, "db": "error", "detail": str(exc)},
+            status_code=503,
+        )
+    return {"ok": True, "db": "ok"}
 
 
 @app.get("/", response_class=HTMLResponse)
